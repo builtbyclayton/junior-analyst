@@ -201,24 +201,42 @@ def index():
     return render_template("index.html")
 
 
+def resolve_ticker(query):
+    """Try to resolve a company name or ticker to a valid ticker symbol."""
+    # 1. Try yf.Search (may fail on some hosting environments)
+    try:
+        search = yf.Search(query, max_results=5)
+        results = search.quotes
+        if results:
+            return results[0]["symbol"]
+    except Exception:
+        pass
+
+    # 2. Try the query directly as a ticker
+    candidate = query.upper().strip()
+    try:
+        info = yf.Ticker(candidate).info
+        if info.get("regularMarketPrice") or info.get("currentPrice") or info.get("longName"):
+            return candidate
+    except Exception:
+        pass
+
+    return None
+
+
 @app.route("/analyze")
 def analyze_route():
     query = request.args.get("q", "").strip()
     if not query:
         return jsonify({"error": "Please enter a company name or ticker."})
     try:
-        # Try as ticker first, then search
-        search = yf.Search(query, max_results=1)
-        results = search.quotes
-        if results:
-            ticker_symbol = results[0]["symbol"]
-        else:
-            ticker_symbol = query.upper()
-
+        ticker_symbol = resolve_ticker(query)
+        if not ticker_symbol:
+            return jsonify({"error": f"Could not find '{query}'. Try using the ticker symbol (e.g. AAPL, TSLA)."})
         data = analyze(ticker_symbol)
         return jsonify(data)
     except Exception as e:
-        return jsonify({"error": f"Could not find data for '{query}'. Try using the ticker symbol (e.g. KATE, AAPL)."})
+        return jsonify({"error": f"Could not find data for '{query}'. Try using the ticker symbol (e.g. AAPL, TSLA)."})
 
 
 if __name__ == "__main__":
