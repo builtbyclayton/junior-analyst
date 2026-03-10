@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Junior Analyst</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0f0f0f;
+      color: #e5e5e5;
+      min-height: 100vh;
+    }
+    header { padding: 40px 0 20px; text-align: center; }
+    header h1 { font-size: 2rem; font-weight: 700; }
+    header p { color: #666; margin-top: 6px; font-size: 0.95rem; }
+
+    .search-bar {
+      display: flex; gap: 10px;
+      max-width: 560px; margin: 0 auto 40px; padding: 0 20px;
+    }
+    .search-bar input {
+      flex: 1; padding: 14px 18px; border-radius: 10px;
+      border: 1px solid #2a2a2a; background: #1a1a1a;
+      color: white; font-size: 1rem; outline: none;
+    }
+    .search-bar input:focus { border-color: #555; }
+    .search-bar input::placeholder { color: #555; }
+    .search-bar button {
+      padding: 14px 24px; background: #2563eb; color: white;
+      border: none; border-radius: 10px; font-size: 1rem;
+      font-weight: 600; cursor: pointer;
+    }
+    .search-bar button:hover { background: #1d4ed8; }
+
+    #status { text-align: center; color: #666; font-size: 0.95rem; padding: 40px 0; display: none; }
+    #error-msg { text-align: center; color: #ef4444; font-size: 0.95rem; padding: 20px; display: none; }
+
+    #report { max-width: 900px; margin: 0 auto; padding: 0 20px 80px; display: none; }
+
+    .card {
+      background: #1a1a1a; border: 1px solid #262626;
+      border-radius: 14px; padding: 26px 28px; margin-bottom: 16px;
+    }
+
+    .company-name { font-size: 1.75rem; font-weight: 700; }
+    .ticker { background: #2a2a2a; color: #aaa; font-size: 0.8rem; padding: 3px 10px; border-radius: 6px; margin-left: 8px; vertical-align: middle; }
+    .sub { color: #666; font-size: 0.88rem; margin-top: 6px; }
+    .desc { color: #888; font-size: 0.88rem; margin-top: 14px; line-height: 1.65; }
+
+    /* Verdict */
+    .verdict-row { display: flex; align-items: center; gap: 20px; margin-bottom: 20px; }
+    .verdict-pill {
+      font-size: 1.5rem; font-weight: 800;
+      padding: 8px 28px; border-radius: 10px; letter-spacing: 1px;
+    }
+    .verdict-sub { color: #666; font-size: 0.85rem; }
+
+    .reasons-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .reason-col h4 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+    .bull h4 { color: #22c55e; }
+    .bear h4 { color: #ef4444; }
+    .reason-item {
+      background: #111; border-radius: 8px; padding: 10px 12px;
+      font-size: 0.85rem; color: #aaa; margin-bottom: 8px; line-height: 1.5;
+    }
+    .bull .reason-item::before { content: "▲ "; color: #22c55e; }
+    .bear .reason-item::before { content: "▼ "; color: #ef4444; }
+
+    /* Section headers */
+    .section-label {
+      font-size: 0.72rem; text-transform: uppercase;
+      letter-spacing: 1.5px; color: #444; margin: 24px 0 10px;
+    }
+
+    /* Metric grid */
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+
+    .metric {
+      background: #1a1a1a; border: 1px solid #262626;
+      border-radius: 12px; padding: 18px 18px 14px;
+    }
+    .metric .label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; color: #555; margin-bottom: 8px; }
+    .metric .value { font-size: 1.2rem; font-weight: 600; color: #f0f0f0; }
+    .metric .note { font-size: 0.72rem; color: #444; margin-top: 6px; line-height: 1.4; }
+
+    /* Price bar */
+    .price-track { height: 5px; background: #2a2a2a; border-radius: 99px; margin: 10px 0 5px; }
+    .price-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, #ef4444, #f59e0b, #22c55e); }
+    .price-ends { display: flex; justify-content: space-between; font-size: 0.7rem; color: #444; }
+
+    @media (max-width: 640px) {
+      .grid-3 { grid-template-columns: repeat(2, 1fr); }
+      .reasons-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Junior Analyst</h1>
+  <p>Basic fundamentals. Plain English. No fluff.</p>
+</header>
+
+<div class="search-bar">
+  <input type="text" id="q" placeholder="Search any company or ticker (e.g. Apple, Kate Spade, TSLA)" />
+  <button onclick="search()">Analyze</button>
+</div>
+
+<div id="status">Pulling live data...</div>
+<div id="error-msg"></div>
+<div id="report"></div>
+
+<script>
+document.getElementById("q").addEventListener("keydown", e => { if (e.key === "Enter") search(); });
+
+function search() {
+  const q = document.getElementById("q").value.trim();
+  if (!q) return;
+  document.getElementById("report").style.display = "none";
+  document.getElementById("error-msg").style.display = "none";
+  document.getElementById("status").style.display = "block";
+  document.getElementById("status").textContent = "Pulling live data...";
+
+  fetch("/analyze?q=" + encodeURIComponent(q))
+    .then(r => r.json())
+    .then(d => {
+      document.getElementById("status").style.display = "none";
+      if (d.error) {
+        document.getElementById("error-msg").textContent = d.error;
+        document.getElementById("error-msg").style.display = "block";
+        return;
+      }
+      render(d);
+    });
+}
+
+function metric(label, value, note) {
+  return '<div class="metric">'
+    + '<div class="label">' + label + '</div>'
+    + '<div class="value">' + value + '</div>'
+    + (note ? '<div class="note">' + note + '</div>' : '')
+    + '</div>';
+}
+
+function render(d) {
+  let priceBar = '';
+  if (d.price_position !== null && d.price_position !== undefined) {
+    priceBar = '<div class="price-track"><div class="price-fill" style="width:' + d.price_position + '%"></div></div>'
+      + '<div class="price-ends"><span>' + d.week_low + ' &nbsp;52W Low</span><span>52W High &nbsp;' + d.week_high + '</span></div>';
+  }
+
+  let bulls = d.reasons_bull.length
+    ? d.reasons_bull.map(r => '<div class="reason-item">' + r + '</div>').join('')
+    : '<div class="reason-item">No strong bullish signals detected.</div>';
+  let bears = d.reasons_bear.length
+    ? d.reasons_bear.map(r => '<div class="reason-item">' + r + '</div>').join('')
+    : '<div class="reason-item">No major red flags detected.</div>';
+
+  let html = '';
+
+  // Company header
+  html += '<div class="card">'
+    + '<div class="company-name">' + d.name + ' <span class="ticker">' + d.ticker + '</span></div>'
+    + '<div class="sub">' + d.sector + ' &nbsp;·&nbsp; ' + d.industry + '</div>'
+    + '<div class="desc">' + d.description + '</div>'
+    + '</div>';
+
+  // Verdict
+  html += '<div class="card">'
+    + '<div class="verdict-row">'
+    + '<div class="verdict-pill" style="background:' + d.verdict_color + '22;color:' + d.verdict_color + '">' + d.verdict + '</div>'
+    + '<div class="verdict-sub">Junior Analyst Recommendation</div>'
+    + '</div>'
+    + '<div class="reasons-grid">'
+    + '<div class="reason-col bull"><h4>Reasons to Buy</h4>' + bulls + '</div>'
+    + '<div class="reason-col bear"><h4>Reasons to Be Cautious</h4>' + bears + '</div>'
+    + '</div>'
+    + '</div>';
+
+  // Price & Market
+  html += '<div class="section-label">Price &amp; Market</div>'
+    + '<div class="grid-3">'
+    + '<div class="metric"><div class="label">Current Price</div><div class="value">' + d.price + '</div>' + priceBar + '</div>'
+    + metric("Market Cap", d.market_cap, "Total value of all outstanding shares")
+    + metric("Dividend Yield", d.div_yield, "Annual cash payout to shareholders")
+    + metric("52-Week High", d.week_high, "Highest price in the past year")
+    + metric("52-Week Low", d.week_low, "Lowest price in the past year")
+    + metric("Analyst Price Target", d.analyst_target, "Wall St. consensus 12-month target")
+    + '</div>';
+
+  // Valuation
+  html += '<div class="section-label">Valuation</div>'
+    + '<div class="grid-3">'
+    + metric("P/E Ratio (Trailing)", d.pe_ratio, "What you pay per $1 of past earnings — lower can mean cheaper")
+    + metric("P/E Ratio (Forward)", d.forward_pe, "Based on expected future earnings")
+    + metric("Price-to-Book", d.pb_ratio, "Price vs. accounting value of the company")
+    + metric("EPS", d.eps, "Earnings per share — profit attributable to each share")
+    + metric("Analyst Recommendation", d.analyst_rec, "Consensus view from Wall Street analysts")
+    + '</div>';
+
+  // Income Statement
+  html += '<div class="section-label">Income Statement</div>'
+    + '<div class="grid-3">'
+    + metric("Total Revenue", d.revenue, "Annual sales — how much money came in")
+    + metric("Revenue Growth", d.revenue_growth, "Year-over-year increase in sales")
+    + metric("Profit Margin", d.profit_margin, "% of revenue the company actually keeps as profit")
+    + metric("EBITDA Margin", d.ebitda_margin, "Operating efficiency before interest, taxes & depreciation")
+    + metric("Return on Equity", d.return_on_equity, "How much profit generated per dollar of shareholder equity")
+    + '</div>';
+
+  // Balance Sheet
+  html += '<div class="section-label">Balance Sheet</div>'
+    + '<div class="grid-3">'
+    + metric("Debt-to-Equity", d.debt_to_equity, "How much debt vs. equity — lower is generally safer")
+    + metric("Current Ratio", d.current_ratio, "Ability to cover short-term debts — above 1.0 is healthy")
+    + '</div>';
+
+  // Cash Flow
+  html += '<div class="section-label">Cash Flow</div>'
+    + '<div class="grid-3">'
+    + metric("Free Cash Flow", d.free_cashflow, "Cash left over after running & maintaining the business")
+    + metric("Operating Cash Flow", d.operating_cashflow, "Cash generated purely from core business operations")
+    + '</div>';
+
+  // Macro & Sentiment
+  html += '<div class="section-label">Macro &amp; Market Sentiment</div>'
+    + '<div class="grid-3">'
+    + metric("Beta", d.beta, "Volatility vs. market — above 1 = moves more, below 1 = more stable")
+    + metric("Short Ratio", d.short_ratio, "Days to cover short positions — higher means more bearish bets against the stock")
+    + '</div>';
+
+  document.getElementById("report").innerHTML = html;
+  document.getElementById("report").style.display = "block";
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+</script>
+</body>
+</html>
