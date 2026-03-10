@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, jsonify
 from curl_cffi import requests as curl_requests
+import re
 
 app = Flask(__name__)
 
@@ -12,9 +13,22 @@ def get_yf_session():
     if _session and _crumb:
         return _session, _crumb
     s = curl_requests.Session(impersonate="chrome120")
-    s.get("https://finance.yahoo.com/", timeout=10)
-    r = s.get("https://query2.finance.yahoo.com/v1/test/getcrumb", timeout=10)
-    _crumb = r.text.strip()
+
+    # Visit a stock page to get cookies + crumb embedded in HTML
+    r = s.get("https://finance.yahoo.com/quote/AAPL/", timeout=15)
+    match = re.search(r'"crumb"\s*:\s*"([^"]{5,20})"', r.text)
+    if match:
+        _crumb = match.group(1).encode("utf-8").decode("unicode_escape")
+        _session = s
+        return _session, _crumb
+
+    # Fallback: dedicated crumb endpoint
+    r2 = s.get("https://query2.finance.yahoo.com/v1/test/getcrumb", timeout=10)
+    crumb = r2.text.strip()
+    if len(crumb) < 30 and "<" not in crumb:
+        _crumb = crumb
+    else:
+        _crumb = ""
     _session = s
     return _session, _crumb
 
