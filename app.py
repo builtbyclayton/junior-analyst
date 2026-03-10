@@ -14,21 +14,26 @@ def get_yf_session():
         return _session, _crumb
     s = curl_requests.Session(impersonate="chrome120")
 
-    # Visit a stock page to get cookies + crumb embedded in HTML
-    r = s.get("https://finance.yahoo.com/quote/AAPL/", timeout=15)
-    match = re.search(r'"crumb"\s*:\s*"([^"]{5,20})"', r.text)
-    if match:
-        _crumb = match.group(1).encode("utf-8").decode("unicode_escape")
+    # Stream homepage and stop as soon as crumb is found (~9KB instead of 2.5MB)
+    r = s.get("https://finance.yahoo.com/", stream=True, timeout=15)
+    buf = b""
+    found_crumb = None
+    for chunk in r.iter_content(chunk_size=4096):
+        buf += chunk
+        match = re.search(rb'"crumb"\s*:\s*"([^"]{5,20})"', buf)
+        if match:
+            found_crumb = match.group(1).decode("utf-8")
+            break
+
+    if found_crumb:
+        _crumb = found_crumb
         _session = s
         return _session, _crumb
 
     # Fallback: dedicated crumb endpoint
     r2 = s.get("https://query2.finance.yahoo.com/v1/test/getcrumb", timeout=10)
     crumb = r2.text.strip()
-    if len(crumb) < 30 and "<" not in crumb:
-        _crumb = crumb
-    else:
-        _crumb = ""
+    _crumb = crumb if (len(crumb) < 30 and "<" not in crumb) else ""
     _session = s
     return _session, _crumb
 
