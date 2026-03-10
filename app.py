@@ -266,6 +266,16 @@ def index():
     return render_template("index.html")
 
 
+@app.route("/debug")
+def debug_route():
+    import traceback
+    try:
+        s, crumb = get_yf_session()
+        return jsonify({"crumb": crumb, "cookies": dict(s.cookies)})
+    except Exception as e:
+        return jsonify({"error": str(e), "trace": traceback.format_exc()})
+
+
 @app.route("/analyze")
 def analyze_route():
     query = request.args.get("q", "").strip()
@@ -275,8 +285,9 @@ def analyze_route():
         ticker_symbol = resolve_ticker(query)
         data = analyze(ticker_symbol)
         return jsonify(data)
-    except Exception:
-        return jsonify({"error": f"Could not find data for '{query}'. Try using the ticker symbol (e.g. AAPL, TSLA)."})
+    except Exception as e:
+        import traceback
+        return jsonify({"error": f"Could not find data for '{query}'. Try using the ticker symbol (e.g. AAPL, TSLA).", "detail": str(e), "trace": traceback.format_exc()})
 
 
 if __name__ == "__main__":
